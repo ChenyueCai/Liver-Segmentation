@@ -42,28 +42,34 @@ def convert_to_3channels(img, channel_space):
         img_3c[i,:,:,0] = img[np.max([i-channel_space, 0])]
         img_3c[i,:,:,1] = img[i]
         img_3c[i,:,:,2] = img[np.min([i+channel_space, len(img)-1])]
-
     return img_3c
 
 
 class LiverSegSet(Dataset):
 
-    def __init__(self, ct_dir, seg_dir):
+    def __init__(self, ct_dir, seg_dir, h, w):
         """
         Args:
             ct_dir: a directory with all patients ct scan results (in directory form, dcm files within)
             seg_dir: a directory with all nii segmentation files within
         """
+        self.h = h
+        self.w = w
+
         dcm_dirs = sorted(os.listdir(ct_dir))  # Assume correspondence between ct scan and seg file names
         nii_files = sorted(os.listdir(seg_dir))
         self.ct_image = []
         self.seg_mask = []
         for dcm_dir in dcm_dirs:
-            self.ct_image.append(convert_to_3channels(convert_to_numpy(directory=dcm_dir, file_type='dcm dir'), 3))
-        self.ct_image = np.array(self.ct_image).squeeze(axis=0)
+            if os.path.isdir(ct_dir + '/' + dcm_dir):
+                self.ct_image.append(convert_to_3channels(
+                    convert_to_numpy(directory=ct_dir + '/' + dcm_dir, file_type='dcm dir'), 3))
+        self.ct_image = np.array(self.ct_image).reshape((-1, self.h, self.w, 3))
         for nii_file in nii_files:
-            self.seg_mask.append(convert_to_3channels(convert_to_numpy(filename=nii_file, file_type='nii'), 3))
-        self.seg_mask = np.array(self.seg_mask).squeeze(axis=0)
+            if nii_file.endswith('.nii.gz'):
+                self.seg_mask.append(
+                    convert_to_3channels(convert_to_numpy(filename=seg_dir + '/' + nii_file, file_type='nii'), 3))
+        self.seg_mask = np.array(self.seg_mask).reshape((-1, self.h, self.w, 3))
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
@@ -71,9 +77,13 @@ class LiverSegSet(Dataset):
         return self.ct_image[idx].astype(np.float32), self.seg_mask[idx].astype(np.float32)
 
 
-
 def main():
-    print()
+
+    data_set = LiverSegSet(ct_dir='ct_dirs', seg_dir='seg_files', h=512, w=512)
+    for i in range(4):
+        skio.imsave('dataset_ex/ct'+ str(i) + '.jpg', data_set[i][0])
+        skio.imsave('dataset_ex/seg' + str(i)+'.jpg', data_set[i][1])
+
 
 
 if __name__ == '__main__':
