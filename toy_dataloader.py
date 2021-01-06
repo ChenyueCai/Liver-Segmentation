@@ -1,6 +1,3 @@
-# This toy data loader takes in a DICOM file and a NIFIT
-# Convert them to numpy array
-
 import pydicom
 import nibabel as nib
 from PIL import Image
@@ -35,6 +32,7 @@ def convert_to_numpy(filename=None, directory=None, file_type=None):
         return None
 
 
+# Adopted from Yesh
 def convert_to_3channels(img, channel_space):
     n, h, w = img.shape
     img_3c = np.zeros((n,h,w,3))
@@ -52,6 +50,8 @@ class LiverSegSet(Dataset):
         Args:
             ct_dir: a directory with all patients ct scan results (in directory form, dcm files within)
             seg_dir: a directory with all nii segmentation files within
+            h: height of the image
+            w: width of the image
         """
         self.h = h
         self.w = w
@@ -64,12 +64,15 @@ class LiverSegSet(Dataset):
             if os.path.isdir(ct_dir + '/' + dcm_dir):
                 self.ct_image.append(convert_to_3channels(
                     convert_to_numpy(directory=ct_dir + '/' + dcm_dir, file_type='dcm dir'), 3))
-        self.ct_image = np.array(self.ct_image).reshape((-1, self.h, self.w, 3))
+        self.ct_image = np.array(self.ct_image).reshape((-1, 3, self.h, self.w))
         for nii_file in nii_files:
             if nii_file.endswith('.nii.gz'):
                 self.seg_mask.append(
-                    convert_to_3channels(convert_to_numpy(filename=seg_dir + '/' + nii_file, file_type='nii'), 3))
-        self.seg_mask = np.array(self.seg_mask).reshape((-1, self.h, self.w, 3))
+                    convert_to_numpy(filename=seg_dir + '/' + nii_file, file_type='nii'))
+        self.seg_mask = np.array(self.seg_mask).reshape((-1, self.h, self.w)) # Edited for the dataloader
+
+    def __len__(self):
+        return len(self.ct_image)
 
     def __getitem__(self, idx):
         if torch.is_tensor(idx):
@@ -81,9 +84,8 @@ def main():
 
     data_set = LiverSegSet(ct_dir='ct_dirs', seg_dir='seg_files', h=512, w=512)
     for i in range(4):
-        skio.imsave('dataset_ex/ct'+ str(i) + '.jpg', data_set[i][0])
+        skio.imsave('dataset_ex/ct'+ str(i) + '.jpg', data_set[i][0]) # Current not work for the change in shape
         skio.imsave('dataset_ex/seg' + str(i)+'.jpg', data_set[i][1])
-
 
 
 if __name__ == '__main__':
