@@ -19,7 +19,7 @@ def convert_to_numpy(filename=None, directory=None, file_type=None):
         seg_nii = np.zeros((num_slice, h, w))
         for i in range(num_slice):
             seg_nii[i, :, :] = nii_array[:, :, i]
-        return seg_nii
+        return np.clip(seg_nii, 0, 1)
     elif file_type == 'dcm dir':
         dcm_directory_contents = sorted(os.listdir(directory), reverse=True)
         img_dcm = []
@@ -27,7 +27,7 @@ def convert_to_numpy(filename=None, directory=None, file_type=None):
             if dcm_file.endswith('.dcm'):
                 img_dcm.append(pydicom.dcmread(directory + '/' + dcm_file).pixel_array)
         img_dcm = np.array(img_dcm)
-        return img_dcm
+        return np.clip(img_dcm, 0, 1)
     else:
         return None
 
@@ -64,11 +64,19 @@ class LiverSegSet(Dataset):
             if os.path.isdir(ct_dir + '/' + dcm_dir):
                 self.ct_image.append(convert_to_3channels(
                     convert_to_numpy(directory=ct_dir + '/' + dcm_dir, file_type='dcm dir'), 3))
+        ct_images = self.ct_image
+        self.ct_image = self.ct_image[0]
+        for i in range(1, len(ct_images)):
+            self.ct_image = np.vstack((self.ct_image, ct_images[i]))
         self.ct_image = np.array(self.ct_image).reshape((-1, 3, self.h, self.w))
         for nii_file in nii_files:
             if nii_file.endswith('.nii.gz'):
                 self.seg_mask.append(
                     convert_to_numpy(filename=seg_dir + '/' + nii_file, file_type='nii'))
+        seg_masks = self.seg_mask
+        self.seg_mask = self.seg_mask[0]
+        for i in range(1, len(seg_masks)):
+            self.seg_mask = np.vstack((self.seg_mask, seg_masks[i]))
         self.seg_mask = np.array(self.seg_mask).reshape((-1, self.h, self.w)) # Edited for the dataloader
 
     def __len__(self):

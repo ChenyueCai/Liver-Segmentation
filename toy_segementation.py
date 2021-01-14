@@ -103,11 +103,8 @@ def test(test_loader, device, model, criterion):
 def main():
 
     data_set = LiverSegSet(ct_dir='ct_dirs', seg_dir='seg_files', h=512, w=512)
-    train_indices, val_indices, test_indices = list(range(20)) + list(range(60, 133)), \
-                                               list(range(20, 25)) + list(range(50, 60)), \
-                                               list(range(25, 50))
 
-    train_set, val_set, test_set = train_test_split(train_indices, val_indices, test_indices, data_set)
+    train_set, val_set, test_set = train_test_split_random(0.7, 0.1, data_set)
     train_loader = torch.utils.data.DataLoader(train_set, batch_size=4, shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_set, batch_size=4, shuffle=True)
     test_loader = torch.utils.data.DataLoader(test_set, batch_size=4, shuffle=False)
